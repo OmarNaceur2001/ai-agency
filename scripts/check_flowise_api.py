@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -39,7 +40,7 @@ def node_names(payload: Any) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--catalog", action="store_true", help="Save provider/node metadata under results.")
+    parser.add_argument("--catalog", action="store_true", help="Save provider and node metadata under results.")
     parser.add_argument("--base-url", default=os.environ.get("FLOWISE_BASE_URL", "http://localhost:3000"))
     args = parser.parse_args()
 
@@ -62,6 +63,7 @@ def main() -> int:
         "base_url": base_url,
         "secret_values_written": False,
         "endpoints": {},
+        "node_definitions": {},
     }
     failed = False
 
@@ -73,7 +75,25 @@ def main() -> int:
                 names = node_names(payload)
                 entry["count"] = len(names)
                 entry["names"] = names
+                report["endpoints"][name] = entry
                 print(f"OK {path} — {len(names)} node definitions")
+
+                # Fetch the concrete node schemas for the components relevant to this RAG flow.
+                keywords = ("ollama", "faiss", "text", "markdown", "split", "retriev", "qa", "vectorstore")
+                selected = [node for node in names if any(word in node.casefold() for word in keywords)]
+                for node_name in selected:
+                    node_path = "/api/v1/nodes/" + quote(node_name, safe="")
+                    try:
+                        report["node_definitions"][node_name] = get_json(base_url, node_path, api_key)
+                        print(f"    schema OK: {node_name}")
+                    except HTTPError as error:
+                        report["node_definitions"][node_name] = {
+                            "status": "http_error",
+                            "http_status": error.code,
+                            "path": node_path,
+                        }
+                        print(f"    schema unavailable: {node_name} (HTTP {error.code})")
+                continue
             elif name == "chatflows":
                 entry["chatflow_count"] = len(payload) if isinstance(payload, list) else None
                 entry["payload_type"] = type(payload).__name__
@@ -109,7 +129,7 @@ def main() -> int:
     if failed:
         print("Flowise API inspection incomplete. Resolve authentication/permissions before building or upserting.")
         return 1
-    print("Flowise REST inspection completed. Use returned node/provider names as the source of truth.")
+    print("Flowise REST inspection completed. Use returned schemas and provider names as the source of truth.")
     return 0
 
 
