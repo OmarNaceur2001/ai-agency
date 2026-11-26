@@ -30,7 +30,7 @@ New-Item -ItemType Directory -Force D:\temp,D:\npm-cache | Out-Null
 # Show disk space and verify the two existing Ollama models.
 .\scripts\check_environment.ps1
 
-# Start Flowise in the current terminal (Ctrl+C stops this process).
+# Start Flowise in the background and wait for a local HTTP 200.
 .\scripts\start.ps1
 ~~~
 
@@ -39,7 +39,7 @@ The default Flowise paths match the documented installation:
 - BLOB_STORAGE_PATH = D:\ai-agency-tools\flowise\storage
 - LOG_PATH = D:\ai-agency-tools\flowise\logs
 
-If the existing Flowise process was intentionally started with a different database path, stop it using the same terminal/process owner and set FLOWISE_DATABASE_PATH to that exact existing path before starting. Do not create a new database merely to bypass account authentication. The startup script refuses to launch a second Flowise process if port 3000 is already occupied.
+If the existing Flowise process was intentionally started with a different database path, stop it using the same terminal/process owner and set FLOWISE_DATABASE_PATH to that exact existing path before starting. Do not create a new database merely to bypass account authentication. The startup script launches Flowise in the background, waits up to 90 seconds for /api/v1/version to return HTTP 200, stores stdout/stderr logs under D:, and refuses to launch a second process if port 3000 is already occupied. Stop the returned PID with Stop-Process -Id PID when required.
 
 ## Flowise API authentication
 
