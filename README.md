@@ -1,128 +1,153 @@
-# Démo locale RAG — Clinique Dentaire Sourire, Nabeul
+# Local RAG demo — Clinique Dentaire Sourire
 
-Démo fictive FR / arabe / darija tunisienne : Ollama (LFM3-1.7B et bge-m3), Flowise, FAISS local et n8n. La clinique, l'adresse, les tarifs et les coordonnées sont inventés; ne saisissez aucune donnée personnelle ou médicale. Le widget télécharge `flowise-embed` depuis jsDelivr et nécessite Internet pour cette bibliothèque.
+A local, fictional dental-clinic information assistant in French, Arabic and Tunisian darija. The clinic, address, phone number, opening hours, prices and procedures in the knowledge file are invented test data. Never enter real personal, patient, payment or medical information.
 
-## Diagnostic de cette machine
+## Supported local stack
 
-- PC : **MSI GF63 Thin 11SC**, processeur Intel Core i7-11800H.
-- La propriété Windows `VirtualizationFirmwareEnabled` est **True** et `systeminfo` rapporte « Virtualisation activée dans le microprogramme : Oui ». La virtualisation CPU est donc activée; ne changez pas le BIOS sur la seule foi du message WSL.
-- Cependant `wsl --status` affiche « WSL2 ne peut pas démarrer, car la virtualisation n'est pas activée sur cet ordinateur »; les distributions Ubuntu et `docker-desktop` sont arrêtées. La lecture des fonctionnalités Windows WSL/VirtualMachinePlatform nécessite PowerShell administrateur et n'a pas été possible dans cette session.
-- `docker info` échoue encore : `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine ... The system cannot find the file specified.` Le diagnostic ne prouve pas que le BIOS bloque WSL; vérifier les composants Windows depuis une console administrateur.
-- Le premier essai Ollama a échoué car C: n'avait que 85 Mio libres; le journal indique « Espace insuffisant sur le disque » lors de la copie de `cublasLt64_12.dll`. Le rollback de cet essai a réussi. Le second essai a installé Ollama sur D:. Après la tentative Build Tools, l'espace libre mesuré était **C: 0,38 Go**, **D: 169,82 Go**.
-- Ollama **v0.40.18** est installé dans `D:\Ollama`; `OLLAMA_MODELS` est défini pour l'utilisateur sur `D:\Ollama\models`. LFM3 Q4_K_M et bge-m3 sont téléchargés. L'API `/api/tags` répond HTTP 200; le point d'API `/api/embed` a produit un vecteur bge-m3 de 1 024 dimensions.
-- n8n **2.49.7** est installé sous `D:\ai-agency-tools\npm`; son interface locale a répondu HTTP 200 sur le port 5678. Le profil de cette session est stocké dans `D:\ai-agency-tools\n8n-data`.
-- Node.js système : **v26.13.0**, npm **11.20.0**. Le package Flowise 3.1.4 déclare `engines.node = ^24`; une version portable **Node v24.22.3** est maintenant installée sur D: et son archive a été vérifiée avec le SHA256 officiel.
-- Flowise **3.1.4** est maintenant installé localement dans `D:\ai-agency-tools\flowise-runtime` et démarre avec Node **24.22.3**. L'installation a nécessité `node-gyp@13.1.0` et `better-sqlite3@12.11.1`; le stub global `D:\ai-agency-tools\npm\flowise.cmd` n'est pas utilisable. L'interface a répondu HTTP 200 sur le port 3000. Le journal signale aussi `Cannot find module '@smithy/eventstream-codec'` lors du chargement du nœud AWS Bedrock; le serveur a poursuivi son démarrage et le scénario Ollama n'utilise pas ce nœud. FAISS n'a pas encore été testé.
-- `D:\Ollama` est dans le PATH utilisateur, mais pas nécessairement dans l'environnement hérité par le terminal courant : préfixer le PATH de la session si la commande n'est pas trouvée. cloudflared n'est pas dans le PATH. Python 3.13 et Visual Studio Build Tools 2026 sont présents; aucun logiciel n'a été supprimé.
+- Windows PowerShell; no Docker or WSL required.
+- Ollama at http://localhost:11434:
+  - Chat: hf.co/LiquidAI/LFM3-1.7B-GGUF:Q4_K_M
+  - Embeddings: bge-m3 (1,024 dimensions)
+- Node 24.22.3 portable at D:\node-v24.22.3-win-x64.
+- Flowise 3.1.4 at http://localhost:3000.
+- n8n is installed but is not part of the RAG request path.
+- The browser widget loads the pinned flowise-embed 3.1.6 bundle from jsDelivr; internet is required for that bundle.
 
-## Chemin recommandé maintenant : sans Docker
+The project deliberately does not try to repair WSL, Docker, BIOS settings, Windows features, or install additional runtimes.
 
-Ollama, Flowise et n8n sont installés et leurs interfaces/API locales ont répondu HTTP 200. Node 24.22.3 est présent sur D:. Aucun fichier n'a été supprimé et le BIOS n'a pas été modifié. L'installation antérieure de Build Tools 2022 n'a pas abouti, l'installateur exigeant au moins 3,51 Go libres sur C:.
+## Disk-safe startup
 
-### 1. Ollama et les modèles
+The scripts use D: for temporary files, npm cache, Flowise database, blob storage and logs. They do not clean, delete, move or reset existing data. Keep the original Flowise database path consistent with the instance you intend to use.
 
-Ollama a été installé dans `D:\Ollama` avec ses modèles dans `D:\Ollama\models`, ce qui a évité l'échec du premier essai sur C:. La variable `OLLAMA_MODELS` est persistée dans l'environnement utilisateur. L'installation ne doit pas être relancée. Dans un terminal dont le PATH n'a pas encore été actualisé, utiliser le chemin complet :
+From the repository root:
 
-```powershell
-$env:PATH = "D:\Ollama;$env:PATH"
-& "D:\Ollama\ollama.exe" --version
-& "D:\Ollama\ollama.exe" list
-```
+~~~powershell
+$env:TEMP = "D:\temp"
+$env:TMP = "D:\temp"
+$env:npm_config_cache = "D:\npm-cache"
+New-Item -ItemType Directory -Force D:\temp,D:\npm-cache | Out-Null
 
-Les deux modèles ont été tirés et testés localement. Les premiers essais sans prompt ont montré une compréhension insuffisante de la darija tunisienne. Le prompt a été précisé pour reconnaître « قداش سوم ...؟ », imposer la devise DT et refuser brièvement les demandes hors périmètre. Avec un contexte fictif contrôlé, les essais directs à l'API Ollama ont répondu aux horaires en français, au tarif 40 DT en arabe et en darija tunisienne, et ont refusé la météo sans mentionner la clinique après le dernier ajustement. Aucune des réponses vérifiées ne contenait de balise de réflexion. Ces essais vérifient le modèle et le prompt seulement, pas la récupération RAG ni le critère global de 12/15.
+# Show disk space and verify the two existing Ollama models.
+.\scripts\check_environment.ps1
 
-```powershell
-& "D:\Ollama\ollama.exe" run hf.co/LiquidAI/LFM3-1.7B-GGUF:Q4_K_M "Bonjour, qui es-tu ?"
-```
+# Start Flowise in the current terminal (Ctrl+C stops this process).
+.\scripts\start.ps1
+~~~
 
-La fiche Hugging Face exige Ollama **v0.40.12 ou plus récent**. Flowise local accèdera à Ollama via `http://localhost:11434`; ne pas utiliser `host.docker.internal` dans ce mode. C: reste à faible capacité libre; aucun nettoyage automatique n'a été fait.
+The default Flowise paths match the documented installation:
+- DATABASE_PATH = D:\ai-agency-tools\flowise\data
+- BLOB_STORAGE_PATH = D:\ai-agency-tools\flowise\storage
+- LOG_PATH = D:\ai-agency-tools\flowise\logs
 
-### 2. Rétablir WSL/Docker (facultatif pour ce chemin)
+If the existing Flowise process was intentionally started with a different database path, stop it using the same terminal/process owner and set FLOWISE_DATABASE_PATH to that exact existing path before starting. Do not create a new database merely to bypass account authentication. The startup script refuses to launch a second Flowise process if port 3000 is already occupied.
 
-Dans **PowerShell administrateur**, lire l'état des composants avant d'envisager de les activer :
+## Flowise API authentication
 
-```powershell
-foreach ($feature in @("Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform")) {
-    Get-WindowsOptionalFeature -Online -FeatureName $feature |
-        Select-Object FeatureName, State
+Flowise 3.1.4 protects management REST routes with a Bearer API key. Create the key in the Flowise UI while signed in:
+
+1. Open http://localhost:3000 and sign in using the existing administrator account.
+2. Open Settings → API Keys → Create New Key.
+3. Give it a descriptive name such as ai-agency-day1.
+4. Grant only the permissions needed for this demo:
+   - chatflows:create
+   - chatflows:view
+   - chatflows:update
+   - documentStores:create
+   - documentStores:view
+   - documentStores:add-loader
+   - documentStores:preview-process
+   - documentStores:upsert-config
+   - documentStores:update
+5. Store the key in the current PowerShell session only. Do not commit it, put it in a .env file, paste it into chat, or place it in browser JavaScript.
+
+~~~powershell
+$secure = Read-Host "Flowise API key" -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try {
+    $env:FLOWISE_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
 }
-bcdedit /enum "{current}" | Select-String "hypervisorlaunchtype"
-```
-
-Ces commandes de diagnostic ne modifient pas les composants. Si une fonctionnalité est désactivée, l'activation peut demander un redémarrage; confirmer avant tout changement. Ne réinstallez pas Docker Desktop. Après résolution, vérifier `wsl --status`, `wsl -l -v` puis `docker info`. Le chemin Compose reste disponible ensuite.
-
-### 3. Flowise et n8n localement
-
-Node **24.x** est requis par Flowise 3.1.4; Node 26.13.0 présent sur la machine n'est pas accepté par la plage `^24`. Node v24.22.3 portable est installé dans `D:\node-v24.22.3-win-x64`. Flowise 3.1.4 a été installé dans `D:\ai-agency-tools\flowise-runtime`; la compilation de `better-sqlite3` a réussi avec les overrides `node-gyp@13.1.0` et `better-sqlite3@12.11.1`. Le répertoire est hors du dépôt. Ne pas utiliser le stub `D:\ai-agency-tools\npm\flowise.cmd`, qui échoue avec `MODULE_NOT_FOUND`.
-
-```powershell
-$env:PATH = "D:\node-v24.22.3-win-x64;$env:PATH"
-$env:DATABASE_PATH = "D:\ai-agency-tools\flowise\data"
-$env:BLOB_STORAGE_PATH = "D:\ai-agency-tools\flowise\storage"
-$env:LOG_PATH = "D:\ai-agency-tools\flowise\logs"
-& "D:\node-v24.22.3-win-x64\node.exe" "D:\ai-agency-tools\flowise-runtime\node_modules\flowise\bin\run" start
-```
-
-L'interface Flowise a répondu HTTP 200 sur `http://localhost:3000`. Son journal contient `Cannot find module '@smithy/eventstream-codec'` au chargement du nœud AWS Bedrock, mais le serveur a terminé son initialisation. Ce nœud n'est pas utilisé par le flux Ollama; corriger cette dépendance transitive si une fonctionnalité AWS est nécessaire. La compilation de FAISS sous Windows reste à tester.
-
-n8n 2.49.7 est installé et a répondu HTTP 200 sur `http://localhost:5678`. Pour le redémarrer en local avec son profil sur D:, dans un autre terminal :
-
-```powershell
-$env:PATH = "D:\node-v24.22.3-win-x64;D:\ai-agency-tools\npm;$env:PATH"
-$env:N8N_USER_FOLDER = "D:\ai-agency-tools\n8n-data"
-$env:N8N_DIAGNOSTICS_ENABLED = "false"
-$env:N8N_PERSONALIZATION_ENABLED = "false"
-$env:N8N_VERSION_NOTIFICATIONS_ENABLED = "false"
-& "D:\ai-agency-tools\npm\n8n.cmd" start
-```
-
-### 4. Construire et indexer le RAG local
-
-Suivre [flowise/SETUP.md](./flowise/SETUP.md). Pour ce mode, choisir **FAISS**, enregistrer les fichiers d'index dans `E:\ai-agency\data\faiss`, et configurer ChatOllama et Ollama Embeddings sur `http://localhost:11434`. Faire manuellement l'Upsert depuis l'interface Flowise. Le magasin FAISS est local et persistant si son Base Path est renseigné.
-
-Dans un nouveau terminal, définir l'URL locale et les identifiants Flowise sans les écrire dans un fichier :
-
-```powershell
+finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    $secure.Dispose()
+}
 $env:FLOWISE_BASE_URL = "http://localhost:3000"
-$env:FLOWISE_CHATFLOW_ID = "ID_DU_CHATFLOW"
-$env:FLOWISE_API_KEY = "CLE_API_FLOWISE"
-python .\scripts\test_chatbot.py
-```
 
-Le test envoie 15 questions (7 français, 3 arabe, 5 darija), produit `results\test_results.csv` et ne réussit que si le score est au moins 12/15 avec les 3 refus hors périmètre. Ce score et l'Upsert ne sont pas encore validés.
+python scripts\check_flowise_api.py --catalog
+~~~
 
-La page [web/index.html](./web/index.html) cible `http://localhost:3000` pour ce mode; remplacer son identifiant factice par le Chatflow ID.
+The API inspection script checks the installed server, the node catalogue and Document Store component providers. It never prints the API key. A 401 means the key is absent/invalid; a 403 means the key lacks the permission for the endpoint. Do not attempt to bypass this by deleting or renaming the Flowise database.
 
-## Chemin Docker ultérieur
+## Build the RAG flow
 
-Le [docker-compose.yml](./docker-compose.yml) est conservé : Qdrant, Flowise (port hôte 3001) et n8n (5678). Depuis `E:\ai-agency`, quand `docker info` répond correctement :
+Follow flowise/SETUP.md. The exact installed node definitions are obtained from the running Flowise 3.1.4 instance by check_flowise_api.py; do not guess node input names or submit guessed flowData to the create endpoint.
 
-```powershell
-docker compose up -d
-Invoke-WebRequest http://localhost:3001
-Invoke-WebRequest http://localhost:5678
-Invoke-WebRequest http://localhost:6333/dashboard
-```
+The intended graph is:
+1. Markdown/Text File Loader.
+2. Recursive Character Text Splitter, chunk size 500 and overlap 50.
+3. Ollama Embeddings using bge-m3.
+4. A local persistent vector store. Try FAISS first with base path E:\ai-agency\data\faiss. If FAISS cannot load, select only a persistent local provider actually returned by the installed Flowise catalogue. Do not silently switch to an in-memory store.
+5. ChatOllama using hf.co/LiquidAI/LFM3-1.7B-GGUF:Q4_K_M and temperature 0.1.
+6. Conversational Retrieval QA Chain, with the system instructions in prompts/system_prompt.txt and the vector-store retriever connected to it.
 
-Le Compose utilise `qdrant/qdrant:latest`, `flowiseai/flowise:3.1.4`, `docker.n8n.io/n8nio/n8n:latest`. Les tags Qdrant/n8n sont mobiles; noter les versions réellement tirées par `docker compose images`. Versions observées du client Docker et Compose : 29.9.3 et 5.7.1. Dans le mode conteneur, conserver Qdrant et les URL Ollama `http://host.docker.internal:11434` indiquées dans le guide.
+Save a Chatflow named demo-clinique. Use Flowise's Upsert action to index knowledge/clinique-dentaire-demo.md. Confirm the upsert completes and run a vector-store query that returns relevant clinic chunks. The count reported by Flowise is the authoritative chunk count; do not estimate it from file length.
 
-## Checklist jour 1
+If the installed Flowise build does not expose one of the requested nodes or FAISS fails to load, stop and document the actual provider/node name and error. Do not install Visual Studio components, new runtimes, or packages globally without asking first.
 
-- [x] Installer Ollama sur D:; vérifier la version, les deux modèles, une génération et un embedding bge-m3.
-- [x] Tester directement le prompt système avec des questions FR, arabe, darija et hors périmètre, sur un contexte fictif contrôlé.
-- [x] Installer n8n sur D: et vérifier l'interface locale HTTP 200.
-- [ ] Confirmer l'état des fonctionnalités WSL/VirtualMachinePlatform depuis PowerShell administrateur.
-- [x] Installer Node 24.22.3 portable sur D: et vérifier l'archive avec le SHA256 officiel.
-- [x] Installer Flowise 3.1.4 localement et vérifier l'interface sur le port 3000 (HTTP 200).
-- [ ] Construire le Chatflow, choisir FAISS avec Base Path persistant et faire l'Upsert.
-- [ ] Lancer les 15 tests et atteindre 12/15 avec 3/3 refus; vérifier le widget.
-- [ ] Réessayer Docker seulement si WSL fonctionne.
+## Smoke test and full evaluation
 
-## Fichiers et limites
+After creating and indexing the flow, set its ID in the current session:
 
-- [knowledge/clinique-dentaire-demo.md](./knowledge/clinique-dentaire-demo.md) contient exclusivement des renseignements fictifs; elle ne donne ni diagnostic, ni ordonnance, ni délai de remboursement.
-- [prompts/system_prompt.txt](./prompts/system_prompt.txt) impose la réponse basée sur le contexte et les refus.
-- `scripts/start.ps1` sert au démarrage Compose; le démarrage sans Docker se fait par les commandes locales ci-dessus. `scripts/tunnel.ps1` requiert cloudflared et expose Flowise sur Internet : ne l'utiliser que si nécessaire.
-- Le widget charge une bibliothèque externe jsDelivr; l'application et le modèle sont locaux, mais cette page n'est pas entièrement hors ligne.
-- Les essais directs montrent une compréhension insuffisante de la darija sans consignes explicites; les essais avec prompt et contexte contrôlé ont répondu au prix en dinars tunisiens. La validation de qualité du Chatflow reste à faire; le test par mots-clés est indicatif, pas une évaluation médicale.
-# ai-agency
+~~~powershell
+$env:FLOWISE_CHATFLOW_ID = "YOUR_REAL_CHATFLOW_ID"
+$env:FLOWISE_BASE_URL = "http://localhost:3000"
+
+# 2 French, 1 Arabic, 1 darija, 1 out-of-scope prediction.
+python scripts\test_chatbot.py --smoke
+
+# Run the unchanged 15-question evaluation.
+python scripts\test_chatbot.py
+~~~
+
+The smoke subset is selected from the existing test set; no question, expected keyword or refusal marker is modified. The full run succeeds only at 12/15 or better and 3/3 out-of-scope refusals. CSV output is written to results/test_results.csv. Inspect failed questions and actual answers before changing one configuration variable per iteration.
+
+## Browser widget (localhost only)
+
+The browser must never receive the management API key. Configure the Chatflow to allow embedding from http://localhost:8080 (or the exact localhost origin shown by Flowise's UI). Do not attach a private Flowise API key to the public browser prediction path. In the Flowise process, CORS_ORIGINS and IFRAME_ORIGINS are set to the single local origin http://localhost:8080.
+
+~~~powershell
+$env:FLOWISE_CHATFLOW_ID = "YOUR_REAL_CHATFLOW_ID"
+python scripts\configure_web.py
+
+# In a second PowerShell window, from the repository root:
+.\scripts\serve_web.ps1
+~~~
+
+Open http://localhost:8080. The page uses the exact pinned flowise-embed@3.1.6 version. web/config.js is generated locally and ignored by Git; it contains only the Chatflow ID, never an API key. If configuration is missing, the page displays a setup message instead of calling a placeholder ID.
+
+## Tests and validation
+
+~~~powershell
+python -m unittest discover -s tests -v
+python -m compileall -q scripts tests
+~~~
+
+The repository tests validate the project's static contract only. They do not prove that Flowise, FAISS, CORS, Ollama prediction, or the browser widget work on a particular machine. Keep these acceptance checks separate:
+- Flowise root responds HTTP 200 on port 3000.
+- Chatflow demo-clinique exists.
+- Knowledge file is upserted; record the actual chunk count.
+- Five smoke predictions pass.
+- Full test scores at least 12/15 and all three refusal cases pass.
+- Page returns HTTP 200 on port 8080 and a browser prediction succeeds.
+- Check C: and D: free space at start and end.
+
+## Optional Docker path
+
+Docker Compose remains optional and is not used by the recommended local setup. Its published ports are bound to 127.0.0.1. Do not run it unless WSL/Docker has been independently repaired and the user explicitly chooses that path.
+
+## Known limitations
+
+- The Chatflow and vector index are runtime data in Flowise, not yet committed project artifacts. Export the saved flow from Flowise and review it before adding it to version control.
+- The REST node catalogue is discoverable, but a reliable graph payload must be built from the installed node schemas. This repository does not ship a fabricated flowData file.
+- FAISS has not been verified on this Windows installation. If it fails, record the exact error and use only a persistent local vector provider confirmed by the catalogue.
+- The 15-question keyword evaluator is a small regression check, not a clinical safety or semantic-quality evaluation.
+- All clinic content is fictitious. Do not use this demo with actual patients or clinical data.
