@@ -1,0 +1,33 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  flowise:
+    image: flowiseai/flowise:3.1.4
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - flowise_data:/root/.flowise
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Africa/Tunis
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  qdrant_data:
+  flowise_data:
+  n8n_data:

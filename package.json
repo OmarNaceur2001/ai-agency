@@ -1,0 +1,13 @@
+{
+  "name": "ai-agency",
+  "version": "1.0.0",
+  "description": "Démo fictive FR / arabe / darija tunisienne : Ollama (LFM3-1.7B et bge-m3), Flowise, FAISS local et n8n. La clinique, l'adresse, les tarifs et les coordonnées sont inventés; ne saisissez aucune donnée personnelle ou médicale. Le widget télécharge `flowise-embed` depuis jsDelivr et nécessite Internet pour cette bibliothèque.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

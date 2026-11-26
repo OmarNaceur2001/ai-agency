@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Démo — Clinique Dentaire Sourire</title>
+</head>
+<body>
+  <h1>Clinique Dentaire Sourire — démo locale</h1>
+  <p>Clinique et informations entièrement fictives. N'envoyez aucune donnée personnelle.</p>
+  <script type="module">
+    const API_HOST = "http://localhost:3000";
+    const CHATFLOW_ID = "REMPLACER_PAR_ID_CHATFLOW";
+
+    import Chatbot from "https://cdn.jsdelivr.net/npm/flowise-embed@3.1.6/dist/web.js";
+
+    Chatbot.init({
+      chatflowid: CHATFLOW_ID,
+      apiHost: API_HOST,
+      chatflowConfig: {
+        /* Valeurs fictives uniquement; ne pas saisir de données personnelles. */
+      }
+    });
+  </script>
+</body>
+</html>
