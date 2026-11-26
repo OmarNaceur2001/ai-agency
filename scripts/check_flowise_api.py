@@ -93,6 +93,7 @@ def main() -> int:
                             "path": node_path,
                         }
                         print(f"    schema unavailable: {node_name} (HTTP {error.code})")
+                        failed = True
                 continue
             elif name == "chatflows":
                 entry["chatflow_count"] = len(payload) if isinstance(payload, list) else None
