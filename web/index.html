@@ -3,24 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
   <title>Démo — Clinique Dentaire Sourire</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { margin: 0; padding: 2rem 1rem; color: #1f2937; background: #f8fafc; }
+    main { max-width: 54rem; margin: 0 auto; }
+    .notice { padding: 1rem; border: 1px solid #cbd5e1; border-radius: .75rem; background: white; }
+    #setup-status { white-space: pre-wrap; }
+  </style>
 </head>
 <body>
-  <h1>Clinique Dentaire Sourire — démo locale</h1>
-  <p>Clinique et informations entièrement fictives. N'envoyez aucune donnée personnelle.</p>
+  <main>
+    <h1>Clinique Dentaire Sourire — démonstration locale</h1>
+    <p class="notice">Clinique, adresse, horaires et tarifs entièrement fictifs. N'envoyez aucune donnée personnelle, médicale ou de paiement.</p>
+    <p id="setup-status" class="notice" role="status">Chargement de la configuration…</p>
+  </main>
+  <script src="./config.js"></script>
   <script type="module">
-    const API_HOST = "http://localhost:3000";
-    const CHATFLOW_ID = "REMPLACER_PAR_ID_CHATFLOW";
+    const status = document.getElementById("setup-status");
+    const chatflowId = window.FLOWISE_CONFIG?.chatflowId;
 
-    import Chatbot from "https://cdn.jsdelivr.net/npm/flowise-embed@3.1.6/dist/web.js";
-
-    Chatbot.init({
-      chatflowid: CHATFLOW_ID,
-      apiHost: API_HOST,
-      chatflowConfig: {
-        /* Valeurs fictives uniquement; ne pas saisir de données personnelles. */
+    if (!chatflowId || chatflowId === "REMPLACER_PAR_ID_CHATFLOW") {
+      status.textContent =
+        "Configuration manquante. Depuis la racine du projet, définissez FLOWISE_CHATFLOW_ID puis exécutez : python scripts/configure_web.py";
+    } else {
+      try {
+        const { default: Chatbot } = await import(
+          "https://cdn.jsdelivr.net/npm/flowise-embed@3.1.6/dist/web.js"
+        );
+        Chatbot.init({
+          chatflowid: chatflowId,
+          apiHost: "http://localhost:3000",
+          chatflowConfig: {},
+          theme: {
+            button: { backgroundColor: "#2563eb", right: 20, bottom: 20, size: 56 },
+            chatWindow: {
+              welcomeMessage: "Bonjour ! Comment puis-je vous aider ?",
+              title: "Clinique Dentaire Sourire — Démo",
+              height: 620
+            }
+          }
+        });
+        status.textContent = "Chatbot configuré. Les informations affichées sont fictives.";
+      } catch (error) {
+        status.textContent = "Impossible de charger le widget Flowise. Vérifiez internet et la console du navigateur.";
+        console.error("Flowise widget initialization failed", error);
       }
-    });
+    }
   </script>
 </body>
 </html>
