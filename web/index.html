@@ -24,7 +24,7 @@
     const status = document.getElementById("setup-status");
     const chatflowId = window.FLOWISE_CONFIG?.chatflowId;
 
-    if (!chatflowId || chatflowId === "REMPLACER_PAR_ID_CHATFLOW") {
+    if (!chatflowId) {
       status.textContent =
         "Configuration manquante. Depuis la racine du projet, définissez FLOWISE_CHATFLOW_ID puis exécutez : python scripts/configure_web.py";
     } else {
