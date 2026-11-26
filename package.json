@@ -1,13 +1,14 @@
 {
   "name": "ai-agency",
-  "version": "1.0.0",
-  "description": "Démo fictive FR / arabe / darija tunisienne : Ollama (LFM3-1.7B et bge-m3), Flowise, FAISS local et n8n. La clinique, l'adresse, les tarifs et les coordonnées sont inventés; ne saisissez aucune donnée personnelle ou médicale. Le widget télécharge `flowise-embed` depuis jsDelivr et nécessite Internet pour cette bibliothèque.",
-  "main": "index.js",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Local fictional-clinic RAG demo using Flowise 3.1.4 and Ollama.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "python -m unittest discover -s tests -v",
+    "test:compile": "python -m compileall -q scripts tests",
+    "test:smoke": "python scripts/test_chatbot.py --smoke",
+    "test:rag": "python scripts/test_chatbot.py"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "keywords": ["rag", "flowise", "ollama", "tunisian-darija"],
+  "license": "UNLICENSED"
 }
